@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VACANSEE - University of Mindanao Visayan Campus</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen">
+        <div class="loading-spinner"></div>
+        <p>Loading VACANSEE System...</p>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <div class="logo-container">
+                <img src="assets/images/UM-Tagum-College-1950-removebg-preview.png" alt="UM Logo" class="logo">
+                <div class="logo-text">
+                    <h1 class="university-name">UNIVERSITY OF MINDANAO</h1>
+                    <h2 class="campus-name">Visayan Campus</h2>
+                </div>
+            </div>
+            
+            <div class="nav-menu">
+                <a href="#home" class="nav-link active">Home</a>
+                <a href="#about" class="nav-link">About</a>
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#contact" class="nav-link">Contact</a>              
+            </div>
+            
+            <button class="menu-toggle" onclick="toggleMenu()">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero-section">
+        <div class="container hero-container">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    <span class="highlight">VACANSEE</span>
+                </h1>
+                <h2 class="hero-subtitle">
+                    A Web-Based Application for Real-Time Room Vacancy Identification
+                </h2>
+                <p class="hero-description">
+                    Streamline classroom management and reservation at University of Mindanao Visayan Campus. 
+                    Real-time updates, easy reservations, and efficient room utilization.
+                </p>
+                
+                <div class="user-selection">
+                    <h3>Select Your Role</h3>
+                    <div class="role-buttons">
+                        <button class="role-btn admin-btn" onclick="redirectToLogin('admin')">
+                            <i class="fas fa-user-shield"></i>
+                            <span>Administrator</span>
+                        </button>
+                        <button class="role-btn faculty-btn" onclick="redirectToLogin('faculty')">
+                            <i class="fas fa-chalkboard-teacher"></i>
+                            <span>Faculty</span>
+                        </button>
+                        <button class="role-btn student-btn" onclick="redirectToLogin('student')">
+                            <i class="fas fa-user-graduate"></i>
+                            <span>Student</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="hero-image">
+                <img src="assets/images/UM-IMG.jpeg" alt="Image">                
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about-section">
+        <div class="container">
+            <h2 class="section-title">About VACANSEE</h2>
+            <div class="about-content">
+                <div class="about-card">
+                    <i class="fas fa-bullseye"></i>
+                    <h3>Our Mission</h3>
+                    <p>To provide an efficient, real-time room management system that optimizes classroom utilization and enhances academic activities at UM Visayan Campus.</p>
+                </div>
+                <div class="about-card">
+                    <i class="fas fa-eye"></i>
+                    <h3>Real-Time Visibility</h3>
+                    <p>Get instant updates on room availability, schedules, and reservations across all departments.</p>
+                </div>
+                <div class="about-card">
+                    <i class="fas fa-lock"></i>
+                    <h3>Secure Access</h3>
+                    <p>Role-based authentication ensures secure access to system features based on user privileges.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features-section">
+        <div class="container">
+            <h2 class="section-title">System Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3>Real-Time Updates</h3>
+                    <p>Live room status updates every minute for accurate vacancy information.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <h3>Easy Reservations</h3>
+                    <p>Faculty can reserve rooms with subject details in just a few clicks.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <h3>Analytics & Reports</h3>
+                    <p>Detailed reports on room utilization and scheduling patterns.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h3>Mobile Responsive</h3>
+                    <p>Access the system from any device - desktop, laptop, or mobile.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-filter"></i>
+                    </div>
+                    <h3>Smart Filtering</h3>
+                    <p>Filter rooms by amenities: aircon, projector, computers, whiteboard.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <h3>Notifications</h3>
+                    <p>Get alerts for reservations, approvals, and schedule changes.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Statistics Section -->
+    <section class="stats-section">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3 id="totalRooms">0</h3>
+                    <p>Total Rooms</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="availableRooms">0</h3>
+                    <p>Available Now</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="engineeringRooms">0</h3>
+                    <p>Engineering Rooms</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="dceRooms">0</h3>
+                    <p>DCE Rooms</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact-section">
+        <div class="container">
+            <h2 class="section-title">Contact & Support</h2>
+            <div class="contact-content">
+                <div class="contact-info">
+                    <h3><i class="fas fa-university"></i> University of Mindanao</h3>
+                    <p><i class="fas fa-map-marker-alt"></i> Visayan Campus, Tagum City</p>
+                    <p><i class="fas fa-phone"></i> (+63)945 154 8559</p>
+                    <p><i class="fas fa-envelope"></i> it.support@umindanao.edu.ph</p>
+                </div>
+                <div class="system-info">
+                    <h3>System Requirements</h3>
+                    <ul>
+                        <li><i class="fas fa-check-circle"></i> Modern web browser</li>
+                        <li><i class="fas fa-check-circle"></i> Internet connection</li>
+                        <li><i class="fas fa-check-circle"></i> UM email account</li>
+                        <li><i class="fas fa-check-circle"></i> Valid credentials</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            
+            
+            <div class="footer-bottom">
+                <p>&copy; 2024 VACANSEE - University of Mindanao Visayan Campus. All rights reserved.</p>
+                <p class="version">Version 1.0.0</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="assets/js/script.js"></script>
+    <script>
+        // Simulate loading
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                document.querySelector('.loading-screen').style.display = 'none';
+                updateStats();
+            }, 1000);
+        });
+
+        function updateStats() {
+            // Simulated data - in real system, fetch from API
+            document.getElementById('totalRooms').textContent = '15';
+            document.getElementById('availableRooms').textContent = '12';
+            document.getElementById('engineeringRooms').textContent = '9';
+            document.getElementById('dceRooms').textContent = '6';
+            
+            // Animate numbers
+            const stats = document.querySelectorAll('.stat-card h3');
+            stats.forEach(stat => {
+                const target = parseInt(stat.textContent);
+                let current = 0;
+                const increment = target / 50;
+                const timer = setInterval(() => {
+                    current += increment;
+                    if (current >= target) {
+                        stat.textContent = target;
+                        clearInterval(timer);
+                    } else {
+                        stat.textContent = Math.floor(current);
+                    }
+                }, 20);
+            });
+        }
+
+        function redirectToLogin(role = '') {
+            window.location.href = `login.php${role ? '?role=' + role : ''}`;
+        }
+
+        function toggleMenu() {
+            const navMenu = document.querySelector('.nav-menu');
+            navMenu.classList.toggle('active');
+        }
+
+        // Smooth scroll + active underline animation
+        const navLinks = document.querySelectorAll('.nav-link');
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.getAttribute('href').replace('#','');
+                const target = document.getElementById(targetId);
+                if (target) {
+                    window.scrollTo({
+                        top: target.offsetTop - 80,
+                        behavior: 'smooth'
+                    });
+                }
+                setActive(link);
+            });
+        });
+
+        function setActive(activeLink) {
+            navLinks.forEach(l => l.classList.remove('active'));
+            activeLink.classList.add('active');
+        }
+
+        // Observe sections to update active state on scroll
+        const sections = ['home','about','features','contact'].map(id => document.getElementById(id)).filter(Boolean);
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    const activeLink = document.querySelector(`.nav-link[href="#${id}"]`);
+                    if (activeLink) setActive(activeLink);
+                }
+            });
+        }, { threshold: 0.6 });
+
+        sections.forEach(section => observer.observe(section));
+    </script>
+</body>
+</html>
