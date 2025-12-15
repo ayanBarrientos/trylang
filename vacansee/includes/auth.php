@@ -20,6 +20,11 @@ class Auth {
         $last_name = sanitizeInput($data['last_name']);
         $user_type = sanitizeInput($data['user_type']);
         $department = isset($data['department']) ? sanitizeInput($data['department']) : null;
+
+        // Restrict self-registration to students only; faculty/admin accounts are created by admins.
+        if ($user_type !== 'student') {
+            return ['success' => false, 'message' => 'Only students can self-register. Faculty accounts must be created by an administrator.'];
+        }
         
         // Validate email domain
         if (!preg_match('/@umindanao\.edu\.ph$/', $email)) {

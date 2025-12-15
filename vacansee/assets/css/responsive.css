@@ -82,12 +82,49 @@
         gap: 1rem;
     }
 
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .dashboard .container,
+    .main-content {
+        padding: 1rem;
+    }
+
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35rem;
+    }
+
     .form-grid {
         grid-template-columns: 1fr;
     }
 
     .table-responsive {
         overflow-x: auto;
+    }
+
+    .filter-grid,
+    .details-grid,
+    .report-controls,
+    .quick-actions,
+    .amenities-grid,
+    .room-details-grid,
+    .form-row,
+    .report-content {
+        grid-template-columns: 1fr;
+    }
+
+    .reservation-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .user-menu {
+        width: 100%;
+        justify-content: flex-start;
     }
 }
 
@@ -107,5 +144,36 @@
 
     .stats-grid {
         grid-template-columns: 1fr;
+    }
+
+    .card-body {
+        padding: 1.1rem;
+    }
+
+    .modal-content {
+        width: 96%;
+    }
+
+    table th,
+    table td {
+        white-space: nowrap;
+        font-size: 0.9rem;
+    }
+}
+
+/* Additional tightening for small phones */
+@media (max-width: 640px) {
+    /* Stack action buttons to avoid overflow and wrapping */
+    .actions-cell .user-actions,
+    .action-buttons {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .actions-cell .action-btn,
+    .action-buttons .action-btn {
+        width: 100%;
+        min-width: 0;
     }
 }

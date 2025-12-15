@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $room_id = (int)$_POST['room_id'];
     $edit_id = isset($_POST['edit_id']) ? (int)$_POST['edit_id'] : 0;
     $subject_code = sanitizeInput($_POST['subject_code']);
-    $class_code = sanitizeInput($_POST['class_code']);
+    $subject_name = sanitizeInput($_POST['subject_name']);
     $reservation_date = sanitizeInput($_POST['reservation_date']);
     $start_time = sanitizeInput($_POST['start_time']);
     $end_time = sanitizeInput($_POST['end_time']);
@@ -55,28 +55,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($start_time >= $end_time) {
         $message = '<div class="alert alert-danger">End time must be after start time.</div>';
     } else {
-        // Check if room is available at requested time
-        $check_availability = $conn->prepare("
-            SELECT 1 FROM reservations 
-            WHERE room_id = ? 
-              AND reservation_date = ? 
-              AND id <> ? 
-              AND (start_time < ? AND end_time > ?)
-              AND status IN ('pending', 'approved')
-        ");
-        $check_availability->bind_param(
-            "isiss",
-            $room_id,
-            $reservation_date,
-            $edit_id,
-            $end_time,
-            $start_time
-        );
-        $check_availability->execute();
-        $existing_reservations = $check_availability->get_result();
-
-        if ($existing_reservations->num_rows > 0) {
-            $message = '<div class="alert alert-danger">Room is already reserved for the selected time slot.</div>';
+        // Check if room is available at requested time (reservations + recurring schedules)
+        $conflict = findRoomConflict($conn, $room_id, $reservation_date, $start_time, $end_time, $edit_id);
+        if ($conflict) {
+            $by = $conflict['faculty_name'] ?: 'another faculty member';
+            $from = !empty($conflict['start_time']) ? date('g:i A', strtotime($conflict['start_time'])) : '';
+            $until = !empty($conflict['end_time']) ? date('g:i A', strtotime($conflict['end_time'])) : '';
+            $type = $conflict['type'] ?: ucfirst((string)($conflict['source'] ?? ''));
+            $message = '<div class="alert alert-danger">Room is already occupied by ' . htmlspecialchars($by) . (!empty($from) && !empty($until) ? ' from ' . htmlspecialchars($from) . ' to ' . htmlspecialchars($until) : '') . ' (' . htmlspecialchars($type) . ').</div>';
         } else {
             // Prevent faculty from double-booking themselves across different rooms.
             $check_faculty_conflict = $conn->prepare("
@@ -105,14 +91,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Update reservation
             $stmt = $conn->prepare("
                 UPDATE reservations 
-                   SET room_id = ?, subject_code = ?, class_code = ?, reservation_date = ?, start_time = ?, end_time = ?, purpose = ?, status = 'pending'
+                   SET room_id = ?, subject_code = ?, subject_name = ?, reservation_date = ?, start_time = ?, end_time = ?, purpose = ?, status = 'pending'
                  WHERE id = ? AND faculty_id = ?
             ");
             $stmt->bind_param(
                 "issssssii",
                 $room_id,
                 $subject_code,
-                $class_code,
+                $subject_name,
                 $reservation_date,
                 $start_time,
                 $end_time,
@@ -131,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Insert reservation
             $stmt = $conn->prepare("
                 INSERT INTO reservations 
-                (room_id, faculty_id, subject_code, class_code, reservation_date, start_time, end_time, purpose, status) 
+                (room_id, faculty_id, subject_code, subject_name, reservation_date, start_time, end_time, purpose, status) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
             ");
             $stmt->bind_param(
@@ -139,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $room_id,
                 $faculty_id,
                 $subject_code,
-                $class_code,
+                $subject_name,
                 $reservation_date,
                 $start_time,
                 $end_time,
@@ -161,23 +147,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $check_faculty_conflict->close();
         }
-        $check_availability->close();
     }
 }
 
 // Form defaults
 $subject_code_val = isset($_POST['subject_code']) ? htmlspecialchars($_POST['subject_code']) : ($edit_reservation['subject_code'] ?? '');
-$class_code_val = isset($_POST['class_code']) ? htmlspecialchars($_POST['class_code']) : ($edit_reservation['class_code'] ?? '');
-$reservation_date_val = isset($_POST['reservation_date']) ? htmlspecialchars($_POST['reservation_date']) : ($edit_reservation['reservation_date'] ?? '');
-$start_time_val = isset($_POST['start_time']) ? htmlspecialchars($_POST['start_time']) : ($edit_reservation['start_time'] ?? '08:00');
-$end_time_val = isset($_POST['end_time']) ? htmlspecialchars($_POST['end_time']) : ($edit_reservation['end_time'] ?? '09:00');
+$subject_name_val = isset($_POST['subject_name']) ? htmlspecialchars($_POST['subject_name']) : ($edit_reservation['subject_name'] ?? '');
+$reservation_date_val = isset($_POST['reservation_date'])
+    ? htmlspecialchars($_POST['reservation_date'])
+    : (isset($_GET['reservation_date']) ? htmlspecialchars($_GET['reservation_date']) : ($edit_reservation['reservation_date'] ?? ''));
+$start_time_val = isset($_POST['start_time'])
+    ? htmlspecialchars($_POST['start_time'])
+    : (isset($_GET['start_time']) ? htmlspecialchars($_GET['start_time']) : ($edit_reservation['start_time'] ?? '08:00'));
+$end_time_val = isset($_POST['end_time'])
+    ? htmlspecialchars($_POST['end_time'])
+    : (isset($_GET['end_time']) ? htmlspecialchars($_GET['end_time']) : ($edit_reservation['end_time'] ?? '09:00'));
 $purpose_val = isset($_POST['purpose']) ? htmlspecialchars($_POST['purpose']) : ($edit_reservation['purpose'] ?? '');
 
 // Get all available rooms
 $rooms_query = "
     SELECT * FROM rooms 
     WHERE is_available = 1 
-      AND status = 'vacant' 
+      AND status <> 'maintenance'
     ORDER BY department, room_code
 ";
 $rooms = $conn->query($rooms_query)->fetch_all(MYSQLI_ASSOC);
@@ -301,14 +292,14 @@ closeConnection($conn);
                             <label class="form-label">2. Subject Details</label>
                             <div class="form-row">
                                 <div class="form-group">
-                                   <input type="text" name="class_code" class="form-control" 
-                                           placeholder="Class Code (e.g., 9023)" required
-                                           value="<?php echo $class_code_val; ?>">
+                                   <input type="text" name="subject_code" class="form-control" 
+                                           placeholder="Subject Code (e.g., CS101)" required
+                                           value="<?php echo $subject_code_val; ?>">
                                 </div>
                                 <div class="form-group">
-                                    <input type="text" name="subject_code" class="form-control" 
-                                           placeholder="Subject Code (e.g., IT14/L)" required
-                                           value="<?php echo $subject_code_val; ?>">
+                                    <input type="text" name="subject_name" class="form-control" 
+                                           placeholder="Subject Name (e.g., Introduction to Programming)" required
+                                           value="<?php echo $subject_name_val; ?>">
                                 </div>
                             </div>
                         </div>

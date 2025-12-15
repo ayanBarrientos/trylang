@@ -55,60 +55,17 @@ if ($params) {
 $stmt->execute();
 $available_rooms = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-// Get room occupancy status (approved reservations take priority over schedules)
-$current_date = date('Y-m-d');
-$current_time = date('H:i:s');
-$resOccStmt = $conn->prepare("
-    SELECT r.*, u.first_name, u.last_name
-      FROM reservations r
-      JOIN users u ON r.faculty_id = u.id
-     WHERE r.room_id = ?
-       AND r.status = 'approved'
-       AND DATE(r.reservation_date) = ?
-       AND r.start_time <= ?
-       AND r.end_time > ?
-     LIMIT 1
-");
-
+// Attach live occupancy status
 foreach ($available_rooms as &$room) {
-    $room['is_currently_occupied'] = false;
-    $room['occupied_by'] = '';
-    $room['occupied_class_code'] = '';
-    $room['occupied_subject_code'] = '';
-    $room['occupied_subject_name'] = '';
-    $room['occupied_until'] = '';
-    $room['occupied_type'] = '';
-
-    // 1) Check active approved reservation right now
-    $room_id = (int)$room['id'];
-    $resOccStmt->bind_param('isss', $room_id, $current_date, $current_time, $current_time);
-    $resOccStmt->execute();
-    $reservation = $resOccStmt->get_result()->fetch_assoc();
-
-    if ($reservation) {
-        $room['is_currently_occupied'] = true;
-        $room['occupied_type'] = 'reservation';
-        $room['occupied_by'] = trim(($reservation['first_name'] ?? '') . ' ' . ($reservation['last_name'] ?? ''));
-        $room['occupied_class_code'] = $reservation['class_code'] ?? '';
-        $room['occupied_subject_code'] = $reservation['subject_code'] ?? '';
-        $room['occupied_subject_name'] = $reservation['subject_name'] ?? '';
-        $room['occupied_until'] = $reservation['end_time'] ?? '';
-        continue;
-    }
-
-    // 2) Fallback: active schedule right now
-    $room['current_schedule'] = getCurrentScheduleStatus($conn, $room_id);
-    if ($room['current_schedule']) {
-        $room['is_currently_occupied'] = true;
-        $room['occupied_type'] = 'schedule';
-        $room['occupied_by'] = trim(($room['current_schedule']['first_name'] ?? '') . ' ' . ($room['current_schedule']['last_name'] ?? ''));
-        $room['occupied_class_code'] = $room['current_schedule']['class_code'] ?? '';
-        $room['occupied_subject_code'] = $room['current_schedule']['subject_code'] ?? '';
-        $room['occupied_subject_name'] = $room['current_schedule']['subject_name'] ?? '';
-        $room['occupied_until'] = $room['current_schedule']['end_time'] ?? '';
-    }
+    applyLiveOccupancy($room, $conn);
 }
-$resOccStmt->close();
+unset($room);
+
+$available_rooms = array_values(array_filter($available_rooms, function ($room) {
+    return ($room['status_live'] ?? '') !== 'reserved';
+}));
+
+$rooms_total_count = count($available_rooms);
 
 $stmt->close();
 closeConnection($conn);
@@ -156,10 +113,10 @@ closeConnection($conn);
                 </div>
                 
                 <!-- Filters Section -->
-                <div class="filters-section">
-                    <div class="filters-header">
+                <div class="filters-section filters-section--banner">
+                    <div class="filters-header filters-header--banner">
                         <h3><i class="fas fa-filter"></i> Filter Rooms</h3>
-                        <div class="rooms-count"><?php echo count($available_rooms); ?> rooms available</div>
+                        <div class="rooms-count" id="availableCount"><?php echo $rooms_total_count; ?> rooms</div>
                     </div>
                     
                     <form method="GET" action="" id="filterForm">
@@ -224,9 +181,9 @@ closeConnection($conn);
                 </div>
                 
                 <!-- Available Rooms -->
-                <div class="rooms-section">
-                    <div class="rooms-header">
-                        <h3><i class="fas fa-door-open"></i> Available Rooms</h3>
+                <div class="rooms-section rooms-section--banner">
+                    <div class="rooms-header rooms-header--banner">
+                        <h3><i class="fas fa-door-open"></i> Rooms</h3>
                         <div class="rooms-count" id="roomCount"><?php echo count($available_rooms); ?> rooms</div>
                     </div>
                     
@@ -268,26 +225,18 @@ closeConnection($conn);
                                             </div>
                                             <div class="detail-item">
                                                 <i class="fas fa-info-circle"></i>
-                                                <span>Status: <?php echo $room['is_currently_occupied'] ? 'Occupied' : getRoomStatusText($room['status']); ?></span>
+                                                <span>Status: <?php echo getRoomStatusText($room['status_live']); ?></span>
                                             </div>
                                         </div>
                                         
                                         <?php if ($room['is_currently_occupied']): ?>
                                             <div class="occupancy-info">
                                                 <strong><i class="fas fa-chalkboard-teacher"></i> Currently in use:</strong><br>
-                                                Professor: <?php echo htmlspecialchars($room['occupied_by']); ?><br>
-                                                <?php if (!empty($room['occupied_class_code'])): ?>
-                                                    Class Code: <?php echo htmlspecialchars($room['occupied_class_code']); ?><br>
+                                                <?php if (!empty($room['occupied_subject_code']) || !empty($room['occupied_subject_name'])): ?>
+                                                    Subject: <?php echo htmlspecialchars($room['occupied_subject_code']); ?><?php if (!empty($room['occupied_subject_name'])): ?> — <?php echo htmlspecialchars($room['occupied_subject_name']); ?><?php endif; ?><br>
                                                 <?php endif; ?>
-                                                <?php if (!empty($room['occupied_subject_code'])): ?>
-                                                    Subject Code: <?php echo htmlspecialchars($room['occupied_subject_code']); ?><br>
-                                                <?php endif; ?>
-                                                <?php if (!empty($room['occupied_subject_name'])): ?>
-                                                    Subject: <?php echo htmlspecialchars($room['occupied_subject_name']); ?><br>
-                                                <?php endif; ?>
-                                                <?php if (!empty($room['occupied_until'])): ?>
-                                                    Until: <?php echo date('g:i A', strtotime($room['occupied_until'])); ?>
-                                                <?php endif; ?>
+                                                Faculty: <?php echo htmlspecialchars($room['occupied_by']); ?><br>
+                                                Time: <?php echo date('g:i A', strtotime($room['occupied_from'])); ?> - <?php echo date('g:i A', strtotime($room['occupied_until'])); ?>
                                             </div>
                                         <?php else: ?>
                                             <div class="detail-item" style="color: #2ecc71; font-weight: 600;">
@@ -357,12 +306,21 @@ closeConnection($conn);
         
         // Auto-refresh rooms every 60 seconds
         function refreshRooms() {
-            fetch('../includes/check_availability.php')
+            fetch('../includes/check_availability.php' + window.location.search)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success && data.timestamp > lastRefresh) {
-                        // Update room count
-                        document.getElementById('roomCount').textContent = data.count + ' rooms';
+                        // Update counts (respect current filters)
+                        const roomCountEl = document.getElementById('roomCount');
+                        if (roomCountEl && typeof data.total !== 'undefined') {
+                            roomCountEl.textContent = data.total + ' rooms';
+                        }
+
+                        const availableCountEl = document.getElementById('availableCount');
+                        if (availableCountEl && typeof data.total !== 'undefined') {
+                            availableCountEl.textContent = data.total + ' rooms';
+                        }
+
                         lastRefresh = data.timestamp;
                     }
                 })

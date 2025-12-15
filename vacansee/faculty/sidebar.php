@@ -20,7 +20,14 @@ if (isset($_SESSION['user_id'])) {
         $stmtSidebar->close();
 
         // Count approved reservations awaiting view
-        $stmtApproved = $connSidebar->prepare("SELECT COUNT(*) as count FROM reservations WHERE faculty_id = ? AND status = 'approved' AND faculty_viewed = 0");
+        $stmtApproved = $connSidebar->prepare("
+            SELECT COUNT(*) as count
+              FROM reservations
+             WHERE faculty_id = ?
+               AND status = 'approved'
+               AND faculty_viewed = 0
+               AND (reservation_date > CURDATE() OR (reservation_date = CURDATE() AND end_time >= CURTIME()))
+        ");
         $stmtApproved->bind_param("i", $_SESSION['user_id']);
         $stmtApproved->execute();
         $resultApproved = $stmtApproved->get_result();
@@ -47,8 +54,8 @@ if (isset($_SESSION['user_id'])) {
         <li><a href="dashboard.php" class="<?php echo basename($_SERVER['PHP_SELF']) === 'dashboard.php' ? 'active' : ''; ?>">
             <i class="fas fa-tachometer-alt"></i> Dashboard
         </a></li>
-        <li><a href="schedules.php" class="<?php echo basename($_SERVER['PHP_SELF']) === 'schedules.php' ? 'active' : ''; ?>" title="Manage your schedules">
-            <i class="fas fa-calendar-alt"></i> Schedules
+        <li><a href="reservation.php" class="<?php echo basename($_SERVER['PHP_SELF']) === 'reservation.php' ? 'active' : ''; ?>">
+            <i class="fas fa-calendar-plus"></i> Make Reservation
         </a></li>
         <li><a href="reservations.php" class="<?php echo basename($_SERVER['PHP_SELF']) === 'reservations.php' ? 'active' : ''; ?>">
             <i class="fas fa-calendar-check"></i> My Reservations
@@ -58,6 +65,9 @@ if (isset($_SESSION['user_id'])) {
             <?php if ($facultyPendingCount > 0): ?>
                 <span class="menu-badge" title="Pending reservations"><?php echo $facultyPendingCount; ?></span>
             <?php endif; ?>
+        </a></li>
+        <li><a href="schedule.php" class="<?php echo basename($_SERVER['PHP_SELF']) === 'schedule.php' ? 'active' : ''; ?>">
+            <i class="fas fa-calendar-alt"></i> My Schedule
         </a></li>
         <li><a href="leave_notes.php" class="<?php echo basename($_SERVER['PHP_SELF']) === 'leave_notes.php' ? 'active' : ''; ?>">
             <i class="fas fa-clipboard-list"></i> Leave Notes

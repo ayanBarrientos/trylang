@@ -93,6 +93,73 @@ $rooms_query = "SELECT * FROM rooms ORDER BY department, room_code";
 $rooms_result = $conn->query($rooms_query);
 $rooms = $rooms_result->fetch_all(MYSQLI_ASSOC);
 
+// Attach live occupancy details
+foreach ($rooms as &$room) {
+    applyLiveOccupancy($room, $conn);
+}
+unset($room);
+
+// Attach live occupancy details
+foreach ($rooms as &$room) {
+    $current = getCurrentScheduleStatus($conn, $room['id']);
+    if ($current) {
+        $room['occupied_now'] = true;
+        $room['occupied_by'] = trim(($current['first_name'] ?? '') . ' ' . ($current['last_name'] ?? ''));
+        $room['occupied_subject_code'] = $current['subject_code'] ?? '';
+        $room['occupied_subject_name'] = $current['subject_name'] ?? '';
+        $room['occupied_start'] = $current['start_time'] ?? '';
+        $room['occupied_end'] = $current['end_time'] ?? '';
+    } else {
+        $room['occupied_now'] = false;
+    }
+}
+unset($room);
+
+// Attach reserved details for viewing (next approved reservation that hasn't ended yet)
+foreach ($rooms as &$room) {
+    $room['reserved_by'] = '';
+    $room['reserved_subject_code'] = '';
+    $room['reserved_subject_name'] = '';
+    $room['reserved_date'] = '';
+    $room['reserved_from'] = '';
+    $room['reserved_until'] = '';
+
+    if (empty($room['is_currently_occupied']) && ($room['status_live'] ?? '') === 'reserved') {
+        try {
+            $roomId = (int)$room['id'];
+            $stmt = $conn->prepare("
+                SELECT r.*, u.first_name, u.last_name
+                  FROM reservations r
+                  JOIN users u ON r.faculty_id = u.id
+                 WHERE r.room_id = ?
+                   AND r.status = 'approved'
+                   AND (
+                        r.reservation_date > CURDATE()
+                        OR (r.reservation_date = CURDATE() AND r.end_time >= CURTIME())
+                   )
+                 ORDER BY r.reservation_date ASC, r.start_time ASC
+                 LIMIT 1
+            ");
+            $stmt->bind_param("i", $roomId);
+            $stmt->execute();
+            $next = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if ($next) {
+                $room['reserved_by'] = trim(($next['first_name'] ?? '') . ' ' . ($next['last_name'] ?? ''));
+                $room['reserved_subject_code'] = $next['subject_code'] ?? '';
+                $room['reserved_subject_name'] = $next['subject_name'] ?? '';
+                $room['reserved_date'] = $next['reservation_date'] ?? '';
+                $room['reserved_from'] = $next['start_time'] ?? '';
+                $room['reserved_until'] = $next['end_time'] ?? '';
+            }
+        } catch (Throwable $e) {
+            // ignore
+        }
+    }
+}
+unset($room);
+
 closeConnection($conn);
 ?>
 
@@ -181,12 +248,48 @@ closeConnection($conn);
                                                     </div>
                                                 </td>
                                                 <td class="text-center">
-                                                    <span class="room-status status-<?php echo $room['status']; ?>">
-                                                        <?php echo getRoomStatusText($room['status']); ?>
+                                                    <span class="room-status status-<?php echo $room['status_live']; ?>">
+                                                        <?php echo getRoomStatusText($room['status_live']); ?>
                                                     </span>
+                                                    <?php if (!empty($room['is_currently_occupied'])): ?>
+                                                        <button type="button"
+                                                            class="btn-view"
+                                                            style="margin-top: 6px; padding: 6px 12px; font-size: 12px; box-shadow: none;"
+                                                            data-room="<?php echo htmlspecialchars($room['room_code'] . ' - ' . $room['room_name']); ?>"
+                                                            data-subject="<?php echo htmlspecialchars(trim(($room['occupied_subject_code'] ?? '') . (!empty($room['occupied_subject_name']) ? ' - ' . $room['occupied_subject_name'] : ''))); ?>"
+                                                            data-faculty="<?php echo htmlspecialchars($room['occupied_by'] ?? ''); ?>"
+                                                            data-time="<?php echo (!empty($room['occupied_from']) && !empty($room['occupied_until'])) ? htmlspecialchars(date('g:i A', strtotime($room['occupied_from'])) . ' - ' . date('g:i A', strtotime($room['occupied_until']))) : ''; ?>"
+                                                            onclick="openOccupiedDetails(this)">
+                                                            <i class="fas fa-eye"></i> View
+                                                        </button>
+                                                        <div class="room-meta" style="margin-top:6px; text-align:left; display:none;">
+                                                            <strong>Occupied Now</strong><br>
+                                                            <?php if (!empty($room['occupied_subject_code']) || !empty($room['occupied_subject_name'])): ?>
+                                                                <?php echo htmlspecialchars($room['occupied_subject_code']); ?><?php if (!empty($room['occupied_subject_name'])): ?> — <?php echo htmlspecialchars($room['occupied_subject_name']); ?><?php endif; ?><br>
+                                                            <?php endif; ?>
+                                                            <?php if (!empty($room['occupied_by'])): ?>
+                                                                Faculty: <?php echo htmlspecialchars($room['occupied_by']); ?><br>
+                                                            <?php endif; ?>
+                                                            <?php if (!empty($room['occupied_from']) && !empty($room['occupied_until'])): ?>
+                                                                Time: <?php echo date('g:i A', strtotime($room['occupied_from'])); ?> - <?php echo date('g:i A', strtotime($room['occupied_until'])); ?>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    <?php elseif (($room['status_live'] ?? '') === 'reserved'): ?>
+                                                        <button type="button"
+                                                            class="btn-view"
+                                                            style="margin-top: 6px; padding: 6px 12px; font-size: 12px; box-shadow: none;"
+                                                            data-room="<?php echo htmlspecialchars($room['room_code'] . ' - ' . $room['room_name']); ?>"
+                                                            data-date="<?php echo !empty($room['reserved_date']) ? htmlspecialchars(date('F j, Y', strtotime($room['reserved_date']))) : ''; ?>"
+                                                            data-subject="<?php echo htmlspecialchars(trim(($room['reserved_subject_code'] ?? '') . (!empty($room['reserved_subject_name']) ? ' - ' . $room['reserved_subject_name'] : ''))); ?>"
+                                                            data-faculty="<?php echo htmlspecialchars($room['reserved_by'] ?? ''); ?>"
+                                                            data-time="<?php echo (!empty($room['reserved_from']) && !empty($room['reserved_until'])) ? htmlspecialchars(date('g:i A', strtotime($room['reserved_from'])) . ' - ' . date('g:i A', strtotime($room['reserved_until']))) : ''; ?>"
+                                                            onclick="openReservedDetails(this)">
+                                                            <i class="fas fa-eye"></i> View
+                                                        </button>
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td>
-                                                    <?php if ($room['is_available']): ?>
+                                                    <?php if (!empty($room['is_available_live'])): ?>
                                                         <span class="status-badge status-vacant">Available</span>
                                                     <?php else: ?>
                                                         <span class="status-badge status-occupied">Unavailable</span>
@@ -195,10 +298,10 @@ closeConnection($conn);
                                                 <td>
                                                     <div class="action-buttons">
                                                         <button class="action-btn edit-btn" onclick="openEditModal(<?php echo htmlspecialchars(json_encode($room)); ?>)">
-                                                            <i class="fas fa-edit"></i> 
+                                                            <i class="fas fa-edit"></i> Edit
                                                         </button>
                                                         <button class="action-btn delete-btn" onclick="confirmDelete(<?php echo $room['id']; ?>, '<?php echo htmlspecialchars($room['room_code']); ?>')">
-                                                            <i class="fas fa-trash"></i> 
+                                                            <i class="fas fa-trash"></i> Delete
                                                         </button>
                                                     </div>
                                                 </td>
@@ -428,6 +531,66 @@ closeConnection($conn);
         </div>
     </div>
 
+    <!-- Occupied Details Modal -->
+    <div id="occupiedDetailsModal" class="modal">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-door-closed"></i> Occupied Details</h3>
+                <button class="close-modal" onclick="closeOccupiedDetails()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-group">
+                    <div class="detail-label">Room</div>
+                    <div class="detail-value" id="occRoom"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Subject</div>
+                    <div class="detail-value" id="occSubject"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Faculty</div>
+                    <div class="detail-value" id="occFaculty"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Time</div>
+                    <div class="detail-value" id="occTime"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reserved Details Modal -->
+    <div id="reservedDetailsModal" class="modal">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-calendar-check"></i> Reserved Details</h3>
+                <button class="close-modal" onclick="closeReservedDetails()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-group">
+                    <div class="detail-label">Room</div>
+                    <div class="detail-value" id="resRoom"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Date</div>
+                    <div class="detail-value" id="resDate"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Subject</div>
+                    <div class="detail-value" id="resSubject"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Faculty</div>
+                    <div class="detail-value" id="resFaculty"></div>
+                </div>
+                <div class="detail-group">
+                    <div class="detail-label">Time</div>
+                    <div class="detail-value" id="resTime"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -477,6 +640,31 @@ closeConnection($conn);
         
         function closeDeleteModal() {
             document.getElementById('deleteModal').style.display = 'none';
+        }
+
+        function openOccupiedDetails(button) {
+            document.getElementById('occRoom').textContent = button.dataset.room || '';
+            document.getElementById('occSubject').textContent = button.dataset.subject || '—';
+            document.getElementById('occFaculty').textContent = button.dataset.faculty || '—';
+            document.getElementById('occTime').textContent = button.dataset.time || '—';
+            document.getElementById('occupiedDetailsModal').style.display = 'flex';
+        }
+
+        function closeOccupiedDetails() {
+            document.getElementById('occupiedDetailsModal').style.display = 'none';
+        }
+
+        function openReservedDetails(button) {
+            document.getElementById('resRoom').textContent = button.dataset.room || '';
+            document.getElementById('resDate').textContent = button.dataset.date || '—';
+            document.getElementById('resSubject').textContent = button.dataset.subject || '—';
+            document.getElementById('resFaculty').textContent = button.dataset.faculty || '—';
+            document.getElementById('resTime').textContent = button.dataset.time || '—';
+            document.getElementById('reservedDetailsModal').style.display = 'flex';
+        }
+
+        function closeReservedDetails() {
+            document.getElementById('reservedDetailsModal').style.display = 'none';
         }
         
         // Close modals when clicking outside

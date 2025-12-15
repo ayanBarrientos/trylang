@@ -73,9 +73,15 @@ $params = [];
 $types = "";
 
 if ($status_filter) {
-    $sql .= " AND r.status = ?";
-    $params[] = $status_filter;
-    $types .= "s";
+    if ($status_filter === 'done') {
+        $sql .= " AND r.status = 'approved' AND (r.reservation_date < CURDATE() OR (r.reservation_date = CURDATE() AND r.end_time < CURTIME()))";
+    } elseif ($status_filter === 'approved') {
+        $sql .= " AND r.status = 'approved' AND NOT (r.reservation_date < CURDATE() OR (r.reservation_date = CURDATE() AND r.end_time < CURTIME()))";
+    } else {
+        $sql .= " AND r.status = ?";
+        $params[] = $status_filter;
+        $types .= "s";
+    }
 }
 
 if ($date_filter) {
@@ -90,7 +96,6 @@ if ($room_filter > 0) {
     $types .= "i";
 }
 
-// Show latest submitted requests first (stack newest on top)
 $sql .= " ORDER BY r.created_at DESC, r.id DESC";
 
 $stmt = $conn->prepare($sql);
@@ -152,6 +157,7 @@ closeConnection($conn);
                                 <option value="">All Status</option>
                                 <option value="pending" <?php echo $status_filter == 'pending' ? 'selected' : ''; ?>>Pending</option>
                                 <option value="approved" <?php echo $status_filter == 'approved' ? 'selected' : ''; ?>>Approved</option>
+                                <option value="done" <?php echo $status_filter == 'done' ? 'selected' : ''; ?>>Done</option>
                                 <option value="rejected" <?php echo $status_filter == 'rejected' ? 'selected' : ''; ?>>Rejected</option>
                                 <option value="cancelled" <?php echo $status_filter == 'cancelled' ? 'selected' : ''; ?>>Cancelled</option>
                             </select>
@@ -184,15 +190,16 @@ closeConnection($conn);
                 <div class="reservations-list">
                     <?php if (count($reservations) > 0): ?>
                         <?php foreach ($reservations as $reservation): ?>
+                            <?php $status_display = getReservationStatusDisplay($reservation); ?>
                             <div class="reservation-card">
                                 <div class="reservation-header">
                                     <div class="reservation-info">
-                                        <div class="reservation-icon icon-<?php echo $reservation['status']; ?>">
+                                        <div class="reservation-icon icon-<?php echo $status_display; ?>">
                                             <i class="fas fa-calendar-check"></i>
                                         </div>
                                         <div class="reservation-details">
                                             <div class="reservation-title">
-                                                <?php echo htmlspecialchars($reservation['subject_code'] . ' - ' . $reservation['class_code']); ?>
+                                                <?php echo htmlspecialchars($reservation['subject_code'] . ' - ' . $reservation['subject_name']); ?>
                                             </div>
                                             <div class="reservation-subtitle">
                                                 Room: <?php echo htmlspecialchars($reservation['room_code']); ?> • 
@@ -200,8 +207,8 @@ closeConnection($conn);
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="reservation-status status-<?php echo $reservation['status']; ?>">
-                                        <?php echo ucfirst($reservation['status']); ?>
+                                    <div class="reservation-status status-<?php echo $status_display; ?>">
+                                        <?php echo ucfirst($status_display); ?>
                                     </div>
                                 </div>
                                 
@@ -251,7 +258,7 @@ closeConnection($conn);
                                     
                                     <?php
                                         $time_range = date('g:i A', strtotime($reservation['start_time'])) . ' - ' . date('g:i A', strtotime($reservation['end_time']));
-                                        $subject_display = $reservation['subject_code'] . ' - ' . $reservation['class_code'];
+                                        $subject_display = $reservation['subject_code'] . ' - ' . $reservation['subject_name'];
                                         $room_display = $reservation['room_code'] . ' - ' . $reservation['room_name'];
                                         $requested_display = date('M j, g:i A', strtotime($reservation['created_at']));
                                     ?>

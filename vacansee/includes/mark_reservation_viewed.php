@@ -45,6 +45,7 @@ $countStmt = $conn->prepare("
     WHERE faculty_id = ? 
       AND status = 'approved'
       AND faculty_viewed = 0
+      AND (reservation_date > CURDATE() OR (reservation_date = CURDATE() AND end_time >= CURTIME()))
 ");
 $countStmt->bind_param("i", $faculty_id);
 $countStmt->execute();

@@ -13,16 +13,12 @@ $auth = new Auth();
 $error = '';
 $success = '';
 
-// Get role from URL
-$allowed_roles = ['admin', 'faculty', 'student'];
-$selected_role = isset($_GET['role']) && in_array($_GET['role'], $allowed_roles) ? $_GET['role'] : 'student';
-
-if (!in_array($selected_role, $allowed_roles)) {
-    $selected_role = 'student';
-}
+// Self-registration is limited to students; faculty/admin accounts are created by admins.
+$allowed_roles = ['student'];
+$selected_role = 'student';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $post_role = isset($_POST['user_type']) && in_array($_POST['user_type'], $allowed_roles) ? $_POST['user_type'] : 'student';
+    $post_role = 'student';
     
     $data = [
         'email' => $_POST['email'],
@@ -31,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         'first_name' => $_POST['first_name'],
         'last_name' => $_POST['last_name'],
         'user_type' => $post_role,
-        'department' => $_POST['department'] ?? null
+        'department' => null
     ];
     
     // Keep UI selection in sync
@@ -228,23 +224,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
 
             <div class="user-type-indicator">
-                <i class="fas <?php echo $selected_role === 'admin' ? 'fa-user-shield' : ($selected_role === 'faculty' ? 'fa-chalkboard-teacher' : 'fa-user-graduate'); ?>" id="roleIcon"></i>
-                <span id="roleLabel">Registering as <?php echo ucfirst($selected_role); ?></span>
+                <i class="fas fa-user-graduate"></i>
+                <span>Registering as Student</span>
             </div>
 
-            <div class="user-type-selector" style="margin-bottom: 1.5rem;">
-                <button type="button" class="user-type-btn <?php echo $selected_role === 'admin' ? 'active' : ''; ?>" data-type="admin">
-                    <i class="fas fa-user-shield"></i>
-                    Admin
-                </button>
-                <button type="button" class="user-type-btn <?php echo $selected_role === 'faculty' ? 'active' : ''; ?>" data-type="faculty">
-                    <i class="fas fa-chalkboard-teacher"></i>
-                    Faculty
-                </button>
-                <button type="button" class="user-type-btn <?php echo $selected_role === 'student' ? 'active' : ''; ?>" data-type="student">
-                    <i class="fas fa-user-graduate"></i>
-                    Student
-                </button>
+            <div class="alert" style="margin-bottom: 1.5rem; background: rgba(13, 110, 253, 0.1); border: 1px solid rgba(13, 110, 253, 0.2); color: #0d6efd;">
+                <i class="fas fa-info-circle"></i>
+                Faculty accounts are created by administrators. Students can register here.
             </div>
             
             <?php if ($error): ?>
@@ -262,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <?php endif; ?>
             
             <form method="POST" action="" id="registrationForm">
-                <input type="hidden" name="user_type" id="user_type" value="<?php echo $selected_role; ?>">
+                <input type="hidden" name="user_type" id="user_type" value="student">
                 
                 <div class="form-row">
                     <div class="form-group">
@@ -284,17 +270,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                            value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
                     <small class="form-text">Must end with @umindanao.edu.ph</small>
                 </div>
-                
-                <div class="form-group" id="departmentGroup" style="<?php echo $selected_role === 'faculty' ? '' : 'display:none;'; ?>">
-                    <label for="department" class="form-label">Department *</label>
-                    <select id="department" name="department" class="form-control" <?php echo $selected_role === 'faculty' ? 'required' : ''; ?>>
-                        <option value="">Select Department</option>
-                        <option value="Engineering" <?php echo isset($_POST['department']) && $_POST['department'] == 'Engineering' ? 'selected' : ''; ?>>Engineering</option>
-                        <option value="DCE" <?php echo isset($_POST['department']) && $_POST['department'] == 'DCE' ? 'selected' : ''; ?>>DCE</option>
-                        <option value="Other" <?php echo isset($_POST['department']) && $_POST['department'] == 'Other' ? 'selected' : ''; ?>>Other</option>
-                    </select>
-                </div>
-                
                 <div class="form-row">
                     <div class="form-group">
                         <label for="password" class="form-label">Password *</label>
@@ -394,12 +369,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         const matchReq = document.getElementById('matchReq');
         const registerBtn = document.getElementById('registerBtn');
         const passwordMatch = document.getElementById('passwordMatch');
-        const roleButtons = document.querySelectorAll('.user-type-btn');
-        const userTypeInput = document.getElementById('user_type');
-        const roleLabel = document.getElementById('roleLabel');
-        const roleIcon = document.getElementById('roleIcon');
-        const departmentGroup = document.getElementById('departmentGroup');
-        const departmentField = document.getElementById('department');
         
         function checkPasswordStrength(password) {
             let strength = 0;
@@ -470,14 +439,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             const lastName = document.getElementById('last_name').value;
             const email = document.getElementById('email').value;
             const terms = document.getElementById('terms').checked;
-            const selectedRole = userTypeInput.value;
-            const departmentValid = selectedRole !== 'faculty' || (departmentField && departmentField.value);
             
             const strength = checkPasswordStrength(password);
             const match = checkPasswordMatch();
             
             // Enable register button if all conditions are met
-            if (firstName && lastName && email && strength >= 50 && match && terms && departmentValid) {
+            if (firstName && lastName && email && strength >= 50 && match && terms) {
                 registerBtn.disabled = false;
             } else {
                 registerBtn.disabled = true;
@@ -491,45 +458,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         document.getElementById('last_name').addEventListener('input', validateForm);
         document.getElementById('email').addEventListener('input', validateForm);
         document.getElementById('terms').addEventListener('change', validateForm);
-        if (departmentField) {
-            departmentField.addEventListener('change', validateForm);
-        }
-        
-        // Role selection
-        roleButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                roleButtons.forEach(btn => btn.classList.remove('active'));
-                this.classList.add('active');
-                
-                const role = this.dataset.type;
-                userTypeInput.value = role;
-                
-                // Update indicator
-                const iconMap = {
-                    admin: 'fa-user-shield',
-                    faculty: 'fa-chalkboard-teacher',
-                    student: 'fa-user-graduate'
-                };
-                roleIcon.className = `fas ${iconMap[role]}`;
-                roleLabel.textContent = `Registering as ${role.charAt(0).toUpperCase() + role.slice(1)}`;
-                
-                // Toggle department field for faculty
-                if (role === 'faculty') {
-                    departmentGroup.style.display = '';
-                    if (departmentField) {
-                        departmentField.required = true;
-                    }
-                } else {
-                    departmentGroup.style.display = 'none';
-                    if (departmentField) {
-                        departmentField.required = false;
-                        departmentField.value = '';
-                    }
-                }
-                
-                validateForm();
-            });
-        });
         
         // Email validation
         document.getElementById('email').addEventListener('blur', function() {
@@ -546,8 +474,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         document.getElementById('registrationForm').addEventListener('submit', function(e) {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
-            
-            const role = userTypeInput.value;
 
             // Validate UM email
             if (!email.endsWith('@umindanao.edu.ph')) {
@@ -568,13 +494,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if (!checkPasswordMatch()) {
                 e.preventDefault();
                 alert('Passwords do not match.');
-                return false;
-            }
-
-            // Validate department if faculty
-            if (role === 'faculty' && (!departmentField || !departmentField.value)) {
-                e.preventDefault();
-                alert('Please select your department.');
                 return false;
             }
             

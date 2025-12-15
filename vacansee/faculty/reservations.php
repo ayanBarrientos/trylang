@@ -11,6 +11,23 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'faculty') {
 $conn = getConnection();
 $faculty_id = $_SESSION['user_id'];
 
+// Visiting the "My Reservations" tab should clear the notification badge for approved reservations.
+try {
+    $markAllViewed = $conn->prepare("
+        UPDATE reservations
+           SET faculty_viewed = 1
+         WHERE faculty_id = ?
+           AND status = 'approved'
+           AND faculty_viewed = 0
+           AND (reservation_date > CURDATE() OR (reservation_date = CURDATE() AND end_time >= CURTIME()))
+    ");
+    $markAllViewed->bind_param("i", $faculty_id);
+    $markAllViewed->execute();
+    $markAllViewed->close();
+} catch (Throwable $e) {
+    // Ignore; badge will clear on next successful view.
+}
+
 // Get filter parameters
 $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
 $date_filter = isset($_GET['date']) ? $_GET['date'] : '';
@@ -27,9 +44,15 @@ $params = [$faculty_id];
 $types = "i";
 
 if ($status_filter) {
-    $sql .= " AND r.status = ?";
-    $params[] = $status_filter;
-    $types .= "s";
+    if ($status_filter === 'done') {
+        $sql .= " AND r.status = 'approved' AND (r.reservation_date < CURDATE() OR (r.reservation_date = CURDATE() AND r.end_time < CURTIME()))";
+    } elseif ($status_filter === 'approved') {
+        $sql .= " AND r.status = 'approved' AND NOT (r.reservation_date < CURDATE() OR (r.reservation_date = CURDATE() AND r.end_time < CURTIME()))";
+    } else {
+        $sql .= " AND r.status = ?";
+        $params[] = $status_filter;
+        $types .= "s";
+    }
 }
 
 if ($date_filter) {
@@ -59,7 +82,7 @@ closeConnection($conn);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
 </head>
-<body class="dashboard-page">
+<body class="dashboard-page faculty-reservations-page">
     <div class="dashboard">
         <?php include 'sidebar.php'; ?>
 
@@ -92,6 +115,7 @@ closeConnection($conn);
                                 <option value="">All Status</option>
                                 <option value="pending" <?php echo $status_filter == 'pending' ? 'selected' : ''; ?>>Pending</option>
                                 <option value="approved" <?php echo $status_filter == 'approved' ? 'selected' : ''; ?>>Approved</option>
+                                <option value="done" <?php echo $status_filter == 'done' ? 'selected' : ''; ?>>Done</option>
                                 <option value="rejected" <?php echo $status_filter == 'rejected' ? 'selected' : ''; ?>>Rejected</option>
                                 <option value="cancelled" <?php echo $status_filter == 'cancelled' ? 'selected' : ''; ?>>Cancelled</option>
                             </select>
@@ -117,13 +141,14 @@ closeConnection($conn);
                 <div class="reservations-grid reservations-list">
                     <?php if (count($reservations) > 0): ?>
                         <?php foreach ($reservations as $reservation): ?>
+                            <?php $status_display = getReservationStatusDisplay($reservation); ?>
                             <div class="reservation-item reservation-card">
                                 <div class="reservation-header">
                                     <div class="reservation-date">
                                         <?php echo date('F j, Y', strtotime($reservation['reservation_date'])); ?>
                                     </div>
-                                    <div class="reservation-status status-<?php echo $reservation['status']; ?>">
-                                        <?php echo ucfirst($reservation['status']); ?>
+                                    <div class="reservation-status status-<?php echo $status_display; ?>">
+                                        <?php echo ucfirst($status_display); ?>
                                     </div>
                                 </div>
                                 
@@ -164,7 +189,7 @@ closeConnection($conn);
                                             <?php echo htmlspecialchars($reservation['subject_code']); ?>
                                         </div>
                                         <div class="subject-name">
-                                            <?php echo htmlspecialchars($reservation['class_code']); ?>
+                                            <?php echo htmlspecialchars($reservation['subject_name']); ?>
                                         </div>
                                     </div>
                                     
@@ -188,18 +213,19 @@ closeConnection($conn);
                                         <button class="btn-inline btn-cancel" onclick="cancelReservation(<?php echo $reservation['id']; ?>)">
                                             <i class="fas fa-times"></i> Cancel
                                         </button>
-                                    <?php elseif ($reservation['status'] == 'approved'): ?>
-                                        
+                                    <?php elseif ($reservation['status'] == 'approved' && $status_display !== 'done'): ?>
+                                        <button class="btn-inline btn-cancel" onclick="cancelReservation(<?php echo $reservation['id']; ?>)">
+                                            <i class="fas fa-times"></i> Cancel
+                                        </button>
                                     <?php endif; ?>
                                         <button class="btn-view"
                                             data-id="<?php echo $reservation['id']; ?>"
                                             data-room="<?php echo htmlspecialchars($reservation['room_code'] . ' - ' . $reservation['room_name']); ?>"
                                             data-date="<?php echo htmlspecialchars(date('F j, Y', strtotime($reservation['reservation_date']))); ?>"
                                             data-time="<?php echo htmlspecialchars(date('g:i A', strtotime($reservation['start_time'])) . ' - ' . date('g:i A', strtotime($reservation['end_time']))); ?>"
-                                            data-status="<?php echo htmlspecialchars($reservation['status']); ?>"
+                                            data-status="<?php echo htmlspecialchars($status_display); ?>"
                                             data-department="<?php echo htmlspecialchars($reservation['department']); ?>"
-                                            data-class_code="<?php echo htmlspecialchars($reservation['class_code']); ?>"
-                                            data-subject_code="<?php echo htmlspecialchars($reservation['subject_code']); ?>"
+                                            data-subject="<?php echo htmlspecialchars($reservation['subject_code'] . ' - ' . $reservation['subject_name']); ?>"
                                             data-purpose="<?php echo htmlspecialchars($reservation['purpose'] ?? ''); ?>"
                                             data-notes="<?php echo htmlspecialchars($reservation['admin_notes'] ?? ''); ?>"
                                             data-requested="<?php echo htmlspecialchars(date('M j, g:i A', strtotime($reservation['created_at']))); ?>"
@@ -262,8 +288,7 @@ closeConnection($conn);
                 <div class="detail-row"><strong>Room:</strong> ${data.room}</div>
                 <div class="detail-row"><strong>Date:</strong> ${data.date}</div>
                 <div class="detail-row"><strong>Time:</strong> ${data.time}</div>
-                <div class="detail-row"><strong>Class Code:</strong> ${data.class_code}</div>
-                <div class="detail-row"><strong>Subject Code:</strong> ${data.subject_code}</div>
+                <div class="detail-row"><strong>Subject:</strong> ${data.subject}</div>
                 <div class="detail-row"><strong>Status:</strong> <span class="reservation-status status-${data.status}">${data.status.charAt(0).toUpperCase() + data.status.slice(1)}</span></div>
                 <div class="detail-row"><strong>Department:</strong> ${data.department}</div>
                 ${data.purpose ? `<div class="detail-row"><strong>Purpose:</strong> ${data.purpose}</div>` : ''}

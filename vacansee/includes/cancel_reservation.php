@@ -58,6 +58,14 @@ if ($reservation_date < $current_date && $user_type === 'faculty') {
     exit();
 }
 
+// Do not allow cancelling a reservation that has already ended (treat as done/completed).
+$reservation_end_ts = strtotime(($reservation['reservation_date'] ?? '') . ' ' . ($reservation['end_time'] ?? ''));
+if ($reservation_end_ts !== false && $reservation_end_ts < time()) {
+    closeConnection($conn);
+    echo json_encode(['success' => false, 'message' => 'Cannot cancel a completed reservation']);
+    exit();
+}
+
 // Update reservation status to cancelled
 $update_stmt = $conn->prepare("UPDATE reservations SET status = 'cancelled' WHERE id = ?");
 $update_stmt->bind_param("i", $reservation_id);

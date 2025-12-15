@@ -132,17 +132,13 @@ CREATE TABLE `faculty_leave_notes` (
   `start_time` time NOT NULL,
   `end_time` time NOT NULL,
   `reason` text DEFAULT NULL,
-  `status` enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
-  `reviewed_by` int(11) DEFAULT NULL,
-  `reviewed_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 ALTER TABLE `faculty_leave_notes`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `faculty_id` (`faculty_id`),
-  ADD KEY `reviewed_by` (`reviewed_by`);
+  ADD KEY `faculty_id` (`faculty_id`);
 
 ALTER TABLE `faculty_leave_notes`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;

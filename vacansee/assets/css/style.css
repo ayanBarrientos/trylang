@@ -352,48 +352,6 @@ body {
     border: 2px dashed rgba(255, 255, 255, 0.3);
 }
 
-/* Room card layout: keep reserve button pinned to bottom */
-.room-card {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 12px;
-    height: 100%;
-}
-
-.room-card .reserve-btn {
-    margin-top: auto; /* pushes button to the bottom of the card */
-    align-self: stretch;
-    padding: 10px 12px;
-    display: inline-flex;
-    justify-content: center;
-    gap: 8px;
-}
-
-@media (max-width: 768px) {
-    .rooms-grid { grid-template-columns: 1fr 1fr; }
-}
-
-/* Ensure grid items stretch and room cards fill available height */
-.rooms-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.5rem;
-    align-items: stretch;
-}
-
-.rooms-grid > .room-card {
-    height: 100%;
-}
-
-@media (max-width: 1200px) {
-    .rooms-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (max-width: 768px) {
-    .rooms-grid { grid-template-columns: 1fr; }
-}
-
 .image-placeholder i {
     font-size: 8rem;
     color: rgba(255, 255, 255, 0.3);

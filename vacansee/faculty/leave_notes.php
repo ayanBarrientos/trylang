@@ -10,7 +10,6 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'faculty') {
 
 $conn = getConnection();
 $message = '';
-$useApproval = leaveNotesUseApproval($conn);
 
 // Handle new leave note submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -133,7 +132,6 @@ closeConnection($conn);
                                             <th>Date</th>
                                             <th>Time Window</th>
                                             <th>Reason</th>
-                                            <?php if ($useApproval): ?><th>Status</th><?php endif; ?>
                                             <th>Created</th>
                                         </tr>
                                     </thead>
@@ -143,13 +141,6 @@ closeConnection($conn);
                                                 <td><?php echo date('M j, Y', strtotime($note['leave_date'])); ?></td>
                                                 <td><?php echo date('g:i A', strtotime($note['start_time'])); ?> - <?php echo date('g:i A', strtotime($note['end_time'])); ?></td>
                                                 <td><?php echo htmlspecialchars($note['reason'] ?: 'No reason provided'); ?></td>
-                                                <?php if ($useApproval): ?>
-                                                    <?php
-                                                        $st = $note['status'] ?? 'pending';
-                                                        $badgeColor = $st === 'approved' ? '#22c55e' : ($st === 'rejected' ? '#ff6b6b' : '#f59e0b');
-                                                    ?>
-                                                    <td><span class="menu-badge" style="background: <?php echo $badgeColor; ?>;"><?php echo htmlspecialchars(ucfirst($st)); ?></span></td>
-                                                <?php endif; ?>
                                                 <td><?php echo date('M j, Y g:i A', strtotime($note['created_at'])); ?></td>
                                             </tr>
                                         <?php endforeach; ?>

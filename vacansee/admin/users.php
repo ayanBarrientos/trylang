@@ -281,10 +281,8 @@ closeConnection($conn);
                             <label>Department</label>
                             <select name="department" class="form-control">
                                 <option value="">Select Department</option>
-                                <option value="Administration">Administration</option>
                                 <option value="Engineering">Engineering</option>
                                 <option value="DCE">DCE</option>
-                                <option value="Other">Other</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -357,10 +355,8 @@ closeConnection($conn);
                             <label>Department</label>
                             <select name="department" id="edit_department" class="form-control">
                                 <option value="">Select Department</option>
-                                <option value="Administration">Administration</option>
                                 <option value="Engineering">Engineering</option>
                                 <option value="DCE">DCE</option>
-                                <option value="Other">Other</option>
                             </select>
                         </div>
                         <div class="form-group">

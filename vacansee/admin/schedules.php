@@ -13,33 +13,21 @@ $message = '';
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // DELETE ALL (admin)
-    if (isset($_POST['delete_all_schedules']) && $_SESSION['user_type'] === 'admin') {
-        $stmt = $conn->prepare("DELETE FROM schedules");
-
-        if ($stmt->execute()) {
-            $message = '<div class="alert alert-success">All schedules have been deleted.</div>';
-            logActivity($conn, $_SESSION['user_id'], 'delete_all_schedules', "Deleted all schedules by admin ID: " . $_SESSION['user_id']);
-        } else {
-            $message = '<div class="alert alert-danger">Error deleting schedules: ' . $conn->error . '</div>';
-        }
-        $stmt->close();
-    }
     if (isset($_POST['add_schedule'])) {
         $room_id = (int)$_POST['room_id'];
         $day_of_week = sanitizeInput($_POST['day_of_week']);
         $start_time = sanitizeInput($_POST['start_time']);
         $end_time = sanitizeInput($_POST['end_time']);
         $subject_code = sanitizeInput($_POST['subject_code']);
-        $class_code = sanitizeInput($_POST['class_code']);
+        $subject_name = sanitizeInput($_POST['subject_name']);
         $faculty_id = isset($_POST['faculty_id']) ? (int)$_POST['faculty_id'] : null;
         
         $stmt = $conn->prepare("
             INSERT INTO schedules 
-            (room_id, day_of_week, start_time, end_time, subject_code, class_code, faculty_id) 
+            (room_id, day_of_week, start_time, end_time, subject_code, subject_name, faculty_id) 
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->bind_param("isssssi", $room_id, $day_of_week, $start_time, $end_time, $subject_code, $class_code, $faculty_id);
+        $stmt->bind_param("isssssi", $room_id, $day_of_week, $start_time, $end_time, $subject_code, $subject_name, $faculty_id);
         
         if ($stmt->execute()) {
             $message = '<div class="alert alert-success">Schedule added successfully!</div>';
@@ -57,17 +45,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $start_time = sanitizeInput($_POST['start_time']);
         $end_time = sanitizeInput($_POST['end_time']);
         $subject_code = sanitizeInput($_POST['subject_code']);
-        $class_code = sanitizeInput($_POST['class_code']);
+        $subject_name = sanitizeInput($_POST['subject_name']);
         $faculty_id = isset($_POST['faculty_id']) ? (int)$_POST['faculty_id'] : null;
         $is_active = isset($_POST['is_active']) ? 1 : 0;
         
         $stmt = $conn->prepare("
             UPDATE schedules SET 
             room_id = ?, day_of_week = ?, start_time = ?, end_time = ?, 
-            subject_code = ?, class_code = ?, faculty_id = ?, is_active = ? 
+            subject_code = ?, subject_name = ?, faculty_id = ?, is_active = ? 
             WHERE id = ?
         ");
-        $stmt->bind_param("isssssiii", $room_id, $day_of_week, $start_time, $end_time, $subject_code, $class_code, $faculty_id, $is_active, $schedule_id);
+        $stmt->bind_param("isssssiii", $room_id, $day_of_week, $start_time, $end_time, $subject_code, $subject_name, $faculty_id, $is_active, $schedule_id);
         
         if ($stmt->execute()) {
             $message = '<div class="alert alert-success">Schedule updated successfully!</div>';
@@ -149,35 +137,13 @@ closeConnection($conn);
                 </div>
             </div>
 
-                    <!-- Delete All Modal -->
-                    <div id="deleteAllModal" class="modal">
-                        <div class="modal-content" style="max-width:480px;">
-                            <div class="modal-header">
-                                <h3><i class="fas fa-trash-alt"></i> Delete All Schedules</h3>
-                                <button class="close-modal" onclick="closeDeleteAllModal()">&times;</button>
-                            </div>
-                            <div class="modal-body">
-                                <p>Are you sure you want to delete <strong>all</strong> schedules? This action cannot be undone.</p>
-                                <form method="POST" action="">
-                                    <div style="display:flex; gap:10px; margin-top:12px;">
-                                        <button type="submit" name="delete_all_schedules" class="btn-danger" style="flex:1;">Delete All</button>
-                                        <button type="button" class="btn-outline" onclick="closeDeleteAllModal()" style="flex:1;">Cancel</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
             <div class="container schedules-container">
                 <?php echo $message; ?>
                 
                 <!-- Add Schedule Button -->
-                <div style="margin-bottom: 2rem; display:flex; gap:12px; align-items:center;">
+                <div style="margin-bottom: 2rem;">
                     <button class="btn-login" onclick="openAddModal()">
                         <i class="fas fa-plus"></i> Add New Schedule
-                    </button>
-                    <button class="btn-login" onclick="openDeleteAllModal()" title="Delete all schedules">
-                        <i class="fas fa-trash-alt" style="margin-right:6px;"></i> Delete All
                     </button>
                 </div>
 
@@ -254,7 +220,7 @@ closeConnection($conn);
                                         <td>
                                             <div class="subject-info">
                                                 <span class="subject-code"><?php echo htmlspecialchars($schedule['subject_code']); ?></span>
-                                                <span class="subject-name"><?php echo htmlspecialchars($schedule['class_code']); ?></span>
+                                                <span class="subject-name"><?php echo htmlspecialchars($schedule['subject_name']); ?></span>
                                             </div>
                                         </td>
                                         <td>
@@ -262,6 +228,9 @@ closeConnection($conn);
                                                 <div class="faculty-info">
                                                     <span class="faculty-name">
                                                         <?php echo htmlspecialchars($schedule['first_name'] . ' ' . $schedule['last_name']); ?>
+                                                    </span>
+                                                    <span class="faculty-email">
+                                                        <?php echo htmlspecialchars($schedule['email']); ?>
                                                     </span>
                                                 </div>
                                             <?php else: ?>
@@ -350,14 +319,14 @@ closeConnection($conn);
                     
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Class Code *</label>
-                            <input type="text" name="class_code" class="form-control" required 
-                                   placeholder="e.g., 2093">
-                        </div>
-                        <div class="form-group">
                             <label>Subject Code *</label>
                             <input type="text" name="subject_code" class="form-control" required 
-                                   placeholder="e.g., IT14/L">
+                                   placeholder="e.g., CS101">
+                        </div>
+                        <div class="form-group">
+                            <label>Subject Name *</label>
+                            <input type="text" name="subject_name" class="form-control" required 
+                                   placeholder="e.g., Introduction to Programming">
                         </div>
                     </div>
                     
@@ -437,7 +406,7 @@ closeConnection($conn);
                         </div>
                         <div class="form-group">
                             <label>Subject Name *</label>
-                            <input type="text" name="class_code" id="edit_class_code" class="form-control" required>
+                            <input type="text" name="subject_name" id="edit_subject_name" class="form-control" required>
                         </div>
                     </div>
                     
@@ -554,7 +523,7 @@ closeConnection($conn);
             document.getElementById('edit_start_time').value = schedule.start_time;
             document.getElementById('edit_end_time').value = schedule.end_time;
             document.getElementById('edit_subject_code').value = schedule.subject_code;
-            document.getElementById('edit_class_code').value = schedule.class_code;
+            document.getElementById('edit_subject_name').value = schedule.subject_name;
             document.getElementById('edit_faculty_id').value = schedule.faculty_id || '';
             document.getElementById('edit_is_active').checked = schedule.is_active == 1;
             
@@ -572,14 +541,6 @@ closeConnection($conn);
         
         function closeDeleteModal() {
             document.getElementById('deleteModal').style.display = 'none';
-        }
-
-        function openDeleteAllModal() {
-            document.getElementById('deleteAllModal').style.display = 'flex';
-        }
-
-        function closeDeleteAllModal() {
-            document.getElementById('deleteAllModal').style.display = 'none';
         }
         
         // Close modals when clicking outside

@@ -9,30 +9,6 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'admin') {
 }
 
 $conn = getConnection();
-$message = '';
-$useApproval = leaveNotesUseApproval($conn);
-
-// Handle approve/reject updates (only if approval mode is enabled in DB schema)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $useApproval) {
-    if (isset($_POST['update_leave_status'])) {
-        $note_id = isset($_POST['note_id']) ? (int)$_POST['note_id'] : 0;
-        $status = sanitizeInput($_POST['status'] ?? '');
-        if ($note_id <= 0 || !in_array($status, ['approved', 'rejected', 'pending'], true)) {
-            $message = '<div class="alert alert-danger">Invalid request.</div>';
-        } else {
-            $stmt = $conn->prepare("UPDATE faculty_leave_notes SET status = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?");
-            $admin_id = (int)($_SESSION['user_id'] ?? 0);
-            $stmt->bind_param("sii", $status, $admin_id, $note_id);
-            if ($stmt->execute()) {
-                $message = '<div class="alert alert-success">Leave note updated.</div>';
-                logActivity($conn, $_SESSION['user_id'] ?? null, 'update_leave_note_status', "Updated leave note $note_id to $status");
-            } else {
-                $message = '<div class="alert alert-danger">Failed to update leave note.</div>';
-            }
-            $stmt->close();
-        }
-    }
-}
 
 // Track that the admin viewed leave notes (used for sidebar badge count).
 try {
@@ -84,12 +60,6 @@ closeConnection($conn);
             </div>
 
             <div class="container">
-                <?php echo $message; ?>
-                <?php if (!$useApproval): ?>
-                    <div class="alert alert-warning">
-                        
-                    </div>
-                <?php endif; ?>
                 <div class="card">
                     <div class="card-header">
                         <h3><i class="fas fa-clipboard-list"></i> All Leave Notes</h3>
@@ -104,8 +74,6 @@ closeConnection($conn);
                                             <th>Date</th>
                                             <th>Time Window</th>
                                             <th>Reason</th>
-                                            <?php if ($useApproval): ?><th>Status</th><?php endif; ?>
-                                            <?php if ($useApproval): ?><th>Actions</th><?php endif; ?>
                                             <th>Submitted</th>
                                         </tr>
                                     </thead>
@@ -119,27 +87,6 @@ closeConnection($conn);
                                                 <td><?php echo date('M j, Y', strtotime($note['leave_date'])); ?></td>
                                                 <td><?php echo date('g:i A', strtotime($note['start_time'])); ?> - <?php echo date('g:i A', strtotime($note['end_time'])); ?></td>
                                                 <td><?php echo htmlspecialchars($note['reason'] ?: 'No reason provided'); ?></td>
-                                                <?php if ($useApproval): ?>
-                                                    <td>
-                                                        <?php
-                                                            $st = $note['status'] ?? 'pending';
-                                                            $badgeColor = $st === 'approved' ? '#22c55e' : ($st === 'rejected' ? '#ff6b6b' : '#f59e0b');
-                                                        ?>
-                                                        <span class="menu-badge" style="background: <?php echo $badgeColor; ?>;"><?php echo htmlspecialchars(ucfirst($st)); ?></span>
-                                                    </td>
-                                                    <td>
-                                                        <form method="POST" action="" style="display:flex; gap:8px; align-items:center;">
-                                                            <input type="hidden" name="note_id" value="<?php echo (int)$note['id']; ?>">
-                                                            <input type="hidden" name="update_leave_status" value="1">
-                                                            <button type="submit" name="status" value="approved" class="action-btn btn-approve" <?php echo (($note['status'] ?? 'pending') === 'approved') ? 'disabled' : ''; ?>>
-                                                                <i class="fas fa-check"></i> Approve
-                                                            </button>
-                                                            <button type="submit" name="status" value="rejected" class="action-btn btn-reject" <?php echo (($note['status'] ?? 'pending') === 'rejected') ? 'disabled' : ''; ?>>
-                                                                <i class="fas fa-times"></i> Reject
-                                                            </button>
-                                                        </form>
-                                                    </td>
-                                                <?php endif; ?>
                                                 <td><?php echo date('M j, Y g:i A', strtotime($note['created_at'])); ?></td>
                                             </tr>
                                         <?php endforeach; ?>
